@@ -46,9 +46,15 @@
 
 (declare page-comp)
 
-(def ds (React.ListView.DataSource. #js{:rowHasChanged (fn[a b] (= a b))}))
-(def list-data (r/atom (clj->js (range 100))))
-(.log js/console @list-data)
+(def ds (React.ListView.DataSource. #js{:rowHasChanged (fn[a b] false)}))
+
+(defn list-view-source [v]
+  (let [res #js[]]
+    (doseq [item v]
+      (.push res (r/atom item)))
+    (r/atom (js->clj res))))
+
+(def rows (list-view-source (clj->js (range 100))))
 
 (def current-tab (r/atom "tab1"))
 
@@ -69,26 +75,31 @@
         [image {:source {:uri "https://assets-cdn.github.com/images/modules/microsoft_callout/corner.png"} 
                 :style {:width 306 :height 104}}]
 
-        [list-view {:dataSource (.cloneWithRows ds @list-data) 
+        [list-view {:dataSource (.cloneWithRows ds (clj->js @rows))
                     :render-row (fn[row] 
-                                  (r/as-element 
-                                    [touchable-highlight {:style {:border-top-width 1 :border-bottom-color "#000"} :on-press #(alert "list" (str row))}
-                                     [text row]]))
+                                  (js/React.createElement row-comp #js{:row row}))
                     :style {:left 0 :right 0 :height 250 :border-width 1 :border-color "#000"}}]
 
-        [switch {:on-value-change #(.push nav #js{:title "new" :component page-comp})}]]]]
+        [switch {:on-value-change #(.push nav #js{:title "new" :component page-comp})}]
+        [text {:on-press #(swap! (get @rows 99) inc)} "click update list"]
+        [text {:on-press #(swap! rows conj (r/atom 100))} "click add list"]]]]
      [tabs-item {:title "tab2" :selected (= "tab2" @current-tab) :on-press #(reset! current-tab "tab2")}
       [text {:style {:top 100}} "tab2"]]
      [tabs-item {:title "tab3" :selected (= "tab3" @current-tab) :on-press #(reset! current-tab "tab3")}
       [text {:style {:top 100}} "tab3"]]])
 
 (def page-comp (r/reactify-component page))
+(def row-comp (r/reactify-component (fn[props]
+                                      (let [row (props :row)]
+                                        (print props)
+                                        [touchable-highlight {:style {:border-top-width 1 :border-color "#000"} :on-press #(alert "list" (str @row))}
+                                         [text @row]]))))
+
 
 (defn root[]
   [navigator {:initial-route {:title "App4" :component page-comp} :style (styles "fullscreen")}])
 
 (.registerRunnable (.-AppRegistry js/React) "AwesomeProject" 
                    (fn [params]
-                     (r/render [view {:style {:top 0 :left 0 :right 0 :bottom 0 :position "absolute"}}
-                                 [root]] (.-rootTag params))))
+                     (r/render [root] (.-rootTag params))))
                      
